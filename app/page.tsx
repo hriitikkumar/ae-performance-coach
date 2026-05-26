@@ -1,101 +1,128 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+
+type Status = "idle" | "loading" | "success" | "error";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [transcript, setTranscript] = useState("");
+  const [insight, setInsight] = useState("");
+  const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState("");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  async function handleAnalyze() {
+    if (!transcript.trim()) return;
+    setStatus("loading");
+    setInsight("");
+    setError("");
+
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript }),
+      });
+
+      const text = await res.text();
+      if (!text) {
+        throw new Error("No response from server — the request may have timed out.");
+      }
+
+      let data: { insight?: string; error?: string };
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("Unexpected server response. Please try again.");
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || "Something went wrong");
+      }
+
+      setInsight(data.insight ?? "");
+      setStatus("success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+      setStatus("error");
+    }
+  }
+
+  const isLoading = status === "loading";
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col items-center px-4 py-16">
+      <div className="w-full max-w-2xl flex flex-col gap-8">
+        {/* Header */}
+        <div>
+          <p className="text-xs font-semibold tracking-widest text-indigo-400 uppercase mb-2">
+            Gushwork · AEO Sales
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            AE Performance Coach
+          </h1>
+          <p className="mt-2 text-zinc-400 text-sm">
+            Paste a sales call transcript. Get one sharp coaching insight —
+            straight to your inbox.
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        {/* Textarea */}
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="transcript"
+            className="text-xs font-medium text-zinc-400 uppercase tracking-widest"
+          >
+            Call Transcript
+          </label>
+          <textarea
+            id="transcript"
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            placeholder="Paste the full call transcript here…"
+            rows={14}
+            className="w-full rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder-zinc-600 text-sm p-4 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        </div>
+
+        {/* Button */}
+        <button
+          onClick={handleAnalyze}
+          disabled={isLoading || !transcript.trim()}
+          className="self-start px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400"
         >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          {isLoading ? "Analyzing…" : "Analyze Call"}
+        </button>
+
+        {/* Loading state */}
+        {isLoading && (
+          <div className="flex items-center gap-3 text-sm text-zinc-400">
+            <span className="inline-block h-4 w-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+            Reviewing your call against the rubric…
+          </div>
+        )}
+
+        {/* Error state */}
+        {status === "error" && (
+          <div className="rounded-xl border border-red-800 bg-red-950/40 p-4 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        {/* Insight */}
+        {status === "success" && insight && (
+          <div className="rounded-xl border border-indigo-800/50 bg-indigo-950/30 p-6">
+            <p className="text-xs font-semibold tracking-widest text-indigo-400 uppercase mb-3">
+              Coaching Insight
+            </p>
+            <p className="text-zinc-100 leading-relaxed text-[15px]">
+              {insight}
+            </p>
+            <p className="mt-4 text-xs text-zinc-500">
+              Insight also sent to hritik01kumar@gmail.com
+            </p>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
